@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="trinity">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Nexus Trinity • Orb Command</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#030012">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            di_bg: '#030407',
+            di_panel: 'rgba(15, 18, 25, 0.85)',
+            di_active: '#00e5ff',
+            di_glow: 'rgba(0, 229, 255, 0.3)',
+            di_purple: '#bd00ff',
+            di_border: 'rgba(255, 255, 255, 0.12)',
+          },
+          animation: {
+            'spin-slow': 'spin 12s linear infinite',
+            'reverse-spin': 'spin 15s linear infinite reverse',
+            'float': 'float 6s ease-in-out infinite',
+            'pulse-smooth': 'pulseSmooth 3s ease-in-out infinite',
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-10px)' },
+            },
+            pulseSmooth: {
+              '0%, 100%': { opacity: '0.8', transform: 'scale(1)' },
+              '50%': { opacity: '0.4', transform: 'scale(0.95)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --active-color: #00e5ff;
+      --glass-border: rgba(255, 255, 255, 0.12);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    
+    body {
+      margin: 0;
+      background: #030407;
+      color: #eef3f6;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .spatial-bg {
+      position: fixed; inset: 0;
+      background: 
+        radial-gradient(circle at 50% -20%, rgba(0, 229, 255, 0.15), transparent 70%),
+        radial-gradient(circle at 20% 80%, rgba(189, 0, 255, 0.08), transparent 50%);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .hud {
+      position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 8px; padding: 6px 8px;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      z-index: 1000;
+    }
+
+    .hud-btn {
+      background: transparent;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 11px; font-weight: 700;
+      color: rgba(255,255,255,0.6);
+      transition: all 0.3s ease;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .hud-btn.active {
+      background: rgba(0, 229, 255, 0.1);
+      color: var(--active-color);
+      border-color: rgba(0, 229, 255, 0.3);
+    }
+
+    .panel {
+      position: fixed; left: 50%; top: 50%;
+      width: 95%; max-width: 1000px; height: 85vh;
+      transform: translate(-50%, -50%) scale(0.95);
+      opacity: 0; pointer-events: none;
+      background: rgba(10, 12, 18, 0.95);
+      backdrop-filter: blur(40px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      display: flex; flex-direction: column;
+      z-index: 500;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .panel.open {
+      opacity: 1; pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .orb-svg {
+      width: 250px; height: 250px;
+      filter: drop-shadow(0 0 30px rgba(0, 229, 255, 0.2));
+      cursor: pointer;
+    }
+
+    .bg-grid-pattern {
+      background-image: 
+        linear-gradient(45deg, #111 25%, transparent 25%), 
+        linear-gradient(-45deg, #111 25%, transparent 25%), 
+        linear-gradient(45deg, transparent 75%, #111 75%), 
+        linear-gradient(-45deg, transparent 75%, #111 75%);
+      background-size: 20px 20px;
+    }
+
+    iframe { border: none; width: 100%; height: 100%; }
+    
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+    .status-dot.online { background: #00ffaa; box-shadow: 0 0 8px #00ffaa; }
+    .status-dot.offline { background: #ff4444; }
+  </style>
+</head>
+<body>
+
+  <div class="spatial-bg"></div>
+
+  <nav class="hud">
+    <button onclick="Brain.open('home')" id="nav-home" class="hud-btn active">
+      <i data-lucide="aperture" class="w-4 h-4"></i>
+    </button>
+    <div class="w-px h-4 bg-white/10 mx-1"></div>
+    <button onclick="Brain.open('extractor')" id="nav-extractor" class="hud-btn">
+      <i data-lucide="scan-line" class="w-3 h-3"></i><span>LAB</span>
+    </button>
+    <button onclick="Brain.open('cssmaster')" id="nav-cssmaster" class="hud-btn">
+      <i data-lucide="palette" class="w-3 h-3"></i><span>ROOT</span>
+    </button>
+    <button onclick="Brain.open('config')" id="nav-config" class="hud-btn">
+      <i data-lucide="settings-2" class="w-3 h-3"></i><span>CFG</span>
+    </button>
+  </nav>
+
+  <main id="splash">
+    <div class="relative animate-float flex flex-col items-center justify-center h-screen" onclick="Brain.open('extractor')">
+      <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" class="orb-svg">
+        <circle cx="100" cy="100" r="90" stroke="#1e293b" stroke-width="1" class="opacity-50" />
+        <circle cx="100" cy="100" r="90" stroke="#00e5ff" stroke-width="2" stroke-dasharray="20 180" stroke-linecap="round" class="animate-spin-slow" />
+        <path d="M100 45 L148 72 L148 128 L100 155 L52 128 L52 72 Z" stroke="#00e5ff" stroke-width="0.5" fill="rgba(0, 229, 255, 0.05)" class="animate-pulse-smooth" />
+        <circle cx="100" cy="100" r="20" fill="url(#grad1)" />
+        <defs>
+            <radialGradient id="grad1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(100 100) rotate(90) scale(30)">
+                <stop stop-color="#00e5ff" />
+                <stop offset="1" stop-color="#00e5ff" stop-opacity="0" />
+            </radialGradient>
+        </defs>
+      </svg>
+      <span class="mt-8 text-[10px] font-mono tracking-[0.4em] text-cyan-400 opacity-40">NEXUS_OS_TRINITY</span>
+    </div>
+  </main>
+
+  <section id="main-panel" class="panel">
+    <div class="flex justify-between items-center p-5 border-b border-white/10">
+      <div class="flex items-center gap-3">
+        <i data-lucide="cpu" class="text-cyan-400 w-4 h-4"></i>
+        <h2 id="panel-title" class="text-[10px] font-bold font-mono tracking-widest text-gray-400 uppercase"></h2>
+      </div>
+      <button onclick="Brain.close()" class="text-gray-500 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div id="panel-body" class="flex-1 overflow-hidden"></div>
+  </section>
+
+  <div id="di_toast" class="fixed bottom-8 right-8 bg-black/90 border border-cyan-500/30 text-white px-5 py-3 rounded-lg shadow-2xl translate-y-24 transition-transform duration-300 z-[2000] flex items-center gap-3">
+    <i data-lucide="info" class="text-cyan-400 w-4 h-4"></i>
+    <span class="text-xs font-mono" id="di_toastMsg">Ready</span>
+  </div>
+
+  <script>
+    const Brain = {
+      state: {
+        html: '',
+        css: '',
+        extractedHTML: '',
+        visuals: { scale: 1, opacity: 1, y: 0, blur: 0 },
+        rootVars: {}
+      },
+
+      init() {
+        lucide.createIcons();
+      },
+
+      open(type) {
+        if(type === 'home') return this.close();
+        
+        document.querySelectorAll('.hud-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`nav-${type}`).classList.add('active');
+        
+        const p = document.getElementById('main-panel');
+        const b = document.getElementById('panel-body');
+        const t = document.getElementById('panel-title');
+        
+        p.classList.add('open');
+        
+        if(type === 'extractor') this.renderExtractor(b, t);
+        if(type === 'cssmaster') this.renderCSSMaster(b, t);
+        if(type === 'config') this.renderConfig(b, t);
+        
+        lucide.createIcons();
+      },
+
+      close() {
+        document.getElementById('main-panel').classList.remove('open');
+        document.querySelectorAll('.hud-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('nav-home').classList.add('active');
+      },
+
+      /* --- LABORATÓRIO DE EXTRAÇÃO --- */
+      renderExtractor(container, title) {
+        title.innerText = "ORB_EXTRACTOR_LAB";
+        container.innerHTML = `
+          <div class="flex h-full flex-col lg:flex-row">
+            <div class="w-full lg:w-1/3 border-r border-white/5 p-4 flex flex-col gap-4">
+              <textarea id="di_inputSource" class="flex-1 bg-black/40 border border-white/10 rounded-xl p-4 font-mono text-[10px] text-gray-400 focus:border-cyan-500 focus:outline-none resize-none" placeholder="Insira o código bruto aqui...">${this.state.html}</textarea>
+              <button onclick="Brain.processExtraction()" class="w-full py-3 bg-cyan-500 text-black font-bold text-[10px] rounded-xl hover:bg-cyan-400 transition">ISOLAR E RENDERIZAR</button>
+            </div>
+            <div class="flex-1 flex flex-col">
+              <div class="flex-1 bg-grid-pattern relative flex items-center justify-center p-8" id="preview-container">
+                <p class="text-[10px] font-mono opacity-20">AWAITING_ORB_DATA</p>
+              </div>
+              <div class="h-auto p-6 border-t border-white/5 bg-black/40">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div>
+                    <label class="text-[9px] opacity-40 mb-2 block">SCALE: <span id="v-scale">1.0</span></label>
+                    <input type="range" min="0.5" max="2" step="0.1" value="${this.state.visuals.scale}" class="w-full accent-cyan-400" oninput="Brain.updateVisuals('scale', this.value)">
+                  </div>
+                  <div>
+                    <label class="text-[9px] opacity-40 mb-2 block">OPACITY: <span id="v-opacity">100%</span></label>
+                    <input type="range" min="0" max="1" step="0.1" value="${this.state.visuals.opacity}" class="w-full accent-cyan-400" oninput="Brain.updateVisuals('opacity', this.value)">
+                  </div>
+                  <div>
+                    <label class="text-[9px] opacity-40 mb-2 block">Y_POS: <span id="v-y">0px</span></label>
+                    <input type="range" min="-100" max="100" step="10" value="${this.state.visuals.y}" class="w-full accent-cyan-400" oninput="Brain.updateVisuals('y', this.value)">
+                  </div>
+                  <div>
+                    <label class="text-[9px] opacity-40 mb-2 block">BLUR: <span id="v-blur">0px</span></label>
+                    <input type="range" min="0" max="20" step="1" value="${this.state.visuals.blur}" class="w-full accent-cyan-400" oninput="Brain.updateVisuals('blur', this.value)">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        if(this.state.extractedHTML) this.di_renderPreview();
+      },
+
+      di_renderPreview() {
+        const container = document.getElementById('preview-container');
+        if(!container) return;
+        container.innerHTML = '';
+        const iframe = document.createElement('iframe');
+        iframe.id = "di_frame_preview";
+        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        
+        const docHTML = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <script src="https://cdn.tailwindcss.com"><\/script>
+            <style>
+              body { margin: 0; padding: 0; background: transparent; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
+              #inner-target {
+                transition: all 0.2s ease-out;
+                transform: scale(${this.state.visuals.scale}) translateY(${this.state.visuals.y}px);
+                opacity: ${this.state.visuals.opacity};
+                filter: blur(${this.state.visuals.blur}px);
+              }
+              ${this.state.css}
+            </style>
+          </head>
+          <body>
+            <div id="inner-target">${this.state.extractedHTML}</div>
+          </body>
+          </html>
+        `;
+        iframe.srcdoc = docHTML;
+        container.appendChild(iframe);
+      },
+
+      updateVisuals(prop, val) {
+        this.state.visuals[prop] = val;
+        const display = document.getElementById(`v-${prop}`);
+        if(display) display.innerText = (prop === 'opacity') ? Math.round(val*100)+'%' : val + (prop === 'scale' ? '' : 'px');
+        this.di_renderPreview();
+      },
+
+      processExtraction() {
+        const raw = document.getElementById('di_inputSource').value;
+        if(!raw.trim()) return;
+        this.state.html = raw;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(raw, 'text/html');
+        let target = doc.querySelector('svg') || doc.querySelector('[class*="orb"]') || doc.querySelector('div');
+        let css = "";
+        doc.querySelectorAll('style').forEach(s => css += s.innerHTML + "\n");
+        this.state.extractedHTML = target ? target.outerHTML : "EXTRACTION_FAILED";
+        this.state.css = css;
+        this.di_renderPreview();
+        this.notify("Módulo isolado com sucesso.");
+      },
+
+      /* --- CONFIGURAÇÕES --- */
+      renderConfig(b, t) {
+        t.innerText = "CORE_INTERFACE_SETTINGS";
+        
+        const userName = localStorage.getItem('di_userName') || '';
+        const apiKey = localStorage.getItem('di_apiKey') || '';
+        const modelName = localStorage.getItem('di_modelName') || '';
+
+        b.innerHTML = `
+          <div class="p-10 max-w-lg mx-auto space-y-8">
+            <div class="grid gap-6">
+              <div class="space-y-2">
+                <div class="flex justify-between items-center px-1">
+                  <label class="text-[9px] font-mono opacity-40">di_userName</label>
+                  <div class="flex items-center gap-2"><div class="status-dot ${userName ? 'online' : 'offline'}"></div><span class="text-[8px] opacity-30 font-mono">${userName ? 'ACTIVE' : 'NULL'}</span></div>
+                </div>
+                <input type="text" value="${userName}" oninput="Brain.savePersist('di_userName', this.value)" 
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs focus:border-cyan-400 outline-none font-mono text-cyan-100 transition-all">
+              </div>
+
+              <div class="space-y-2">
+                <div class="flex justify-between items-center px-1">
+                  <label class="text-[9px] font-mono opacity-40">di_apiKey</label>
+                  <div class="flex items-center gap-2"><div class="status-dot ${apiKey ? 'online' : 'offline'}"></div><span class="text-[8px] opacity-30 font-mono">${apiKey ? 'ENCRYPTED' : 'REQUIRED'}</span></div>
+                </div>
+                <input type="password" value="${apiKey}" oninput="Brain.savePersist('di_apiKey', this.value)" 
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs focus:border-cyan-400 outline-none font-mono text-cyan-100 transition-all">
+              </div>
+
+              <div class="space-y-2">
+                <div class="flex justify-between items-center px-1">
+                  <label class="text-[9px] font-mono opacity-40">di_modelName</label>
+                  <div class="flex items-center gap-2"><div class="status-dot ${modelName ? 'online' : 'offline'}"></div><span class="text-[8px] opacity-30 font-mono">DYNAMIC_READ</span></div>
+                </div>
+                <input type="text" value="${modelName}" oninput="Brain.savePersist('di_modelName', this.value)" 
+                  placeholder="Ex: gemini-2.0-flash"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs focus:border-cyan-400 outline-none font-mono text-cyan-100 transition-all">
+              </div>
+            </div>
+
+            <div class="pt-6 border-t border-white/5">
+               <div class="flex items-center gap-4 text-[9px] font-mono opacity-40">
+                  <i data-lucide="database" class="w-3 h-3"></i>
+                  <span>PERSISTÊNCIA: LOCAL_STORAGE_ACTIVE</span>
+               </div>
+            </div>
+          </div>
+        `;
+        lucide.createIcons();
+      },
+
+      savePersist(key, val) {
+        localStorage.setItem(key, val);
+        const input = event.target;
+        const statusLabel = input.parentElement.querySelector('.status-dot');
+        const textLabel = input.parentElement.querySelector('span');
+        
+        if (statusLabel) {
+           statusLabel.className = `status-dot ${val ? 'online' : 'offline'}`;
+           textLabel.innerText = val ? (key === 'di_apiKey' ? 'ENCRYPTED' : 'ACTIVE') : 'NULL';
+        }
+      },
+
+      /* --- CSS ROOT MANAGER --- */
+      renderCSSMaster(container, title) {
+        title.innerText = "VARIABLES_ROOT_SYSTEM";
+        container.innerHTML = `<div class="p-8 text-[10px] font-mono opacity-40">SCANNING_DOM_TREE...</div>`;
+        this.extractRoot();
+      },
+
+      extractRoot() {
+        const raw = this.state.html;
+        if(!raw) return;
+        const rootRegex = /:root\s*{([^}]+)}/g;
+        let match;
+        this.state.rootVars = {};
+        while ((match = rootRegex.exec(raw)) !== null) {
+          match[1].split(';').forEach(d => {
+            const p = d.split(':');
+            if(p.length === 2 && p[0].trim().startsWith('--')) this.state.rootVars[p[0].trim()] = p[1].trim();
+          });
+        }
+        this.renderRootList();
+      },
+
+      renderRootList() {
+        const b = document.getElementById('panel-body');
+        let html = `<div class="p-6 h-full overflow-y-auto space-y-2 pb-20">`;
+        if (Object.keys(this.state.rootVars).length === 0) {
+          html += `<div class="text-[10px] font-mono opacity-20 p-4">NENHUMA_VARIAVEL_ENCONTRADA</div>`;
+        }
+        for(let k in this.state.rootVars) {
+          html += `
+            <div class="flex items-center gap-4 bg-white/5 p-3 rounded-xl border border-white/5 hover:border-cyan-500/30 transition">
+              <span class="text-[10px] font-mono text-cyan-400 w-1/3 truncate">${k}</span>
+              <input type="text" value="${this.state.rootVars[k]}" class="flex-1 bg-black/40 border border-white/10 rounded-lg p-2 text-[10px] text-white focus:border-cyan-400 outline-none font-mono">
+            </div>
+          `;
+        }
+        html += `</div>`;
+        b.innerHTML = html;
+      },
+
+      notify(msg) {
+        const t = document.getElementById('di_toast');
+        document.getElementById('di_toastMsg').innerText = msg;
+        t.style.transform = "translateY(0)";
+        setTimeout(() => t.style.transform = "translateY(100px)", 3000);
+      }
+    };
+
+    window.onload = () => Brain.init();
+  </script>
+</body>
+</html>
+
